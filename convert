@@ -31,3 +31,13 @@ py -m pip install fastapi uvicorn python-dotenv jinja2 python-multipart requests
 
 cd D:\Volvo\260909_Volvo\C2I\gpt
 py -m uvicorn app:app --reload
+
+
+Write-Host "=== [1] Cau hinh proxy cua may ==="
+netsh winhttp show proxy
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Select-Object ProxyEnable,ProxyServer,AutoConfigURL
+Write-Host "=== [2] TCP truc tiep tu PowerShell ==="
+Test-NetConnection api.volvogenaihubqa.volvogroup.net -Port 443 | Select-Object ComputerName,RemoteAddress,TcpTestSucceeded
+Write-Host "=== [3] TCP truc tiep tu chinh Node ==="
+node -e "require('net').connect({host:'api.volvogenaihubqa.volvogroup.net',port:443},()=>{console.log('  Node TCP: OK');process.exit(0)}).on('error',e=>{console.log('  Node TCP: FAIL '+e.code);process.exit(1)}).setTimeout(10000,function(){console.log('  Node TCP: TIMEOUT');process.exit(1)})"
+
