@@ -24,3 +24,10 @@ if ($a -eq $b) { Write-Host "[6] OK  cert.pem va key.pem la mot cap" -Foreground
 
 
 https://api.volvogenaihubqa.volvogroup.net/
+
+
+py --version
+py -m pip install fastapi uvicorn python-dotenv jinja2 python-multipart requests
+
+cd D:\Volvo\260909_Volvo\C2I\gpt
+py -m uvicorn app:app --reload
