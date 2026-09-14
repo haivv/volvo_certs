@@ -21,3 +21,6 @@ Write-Host "[4] noi dung certificate:"; & $ssl x509 -in $cert -noout -subject -d
 Write-Host ("[5] so certificate trong cert.pem: " + (Select-String -Path $cert -Pattern 'BEGIN CERTIFICATE' -AllMatches).Count)
 $a = (& $ssl x509 -in $cert -noout -pubkey) -join "`n"; $b = (& $ssl pkey -in $key -pubout) -join "`n"
 if ($a -eq $b) { Write-Host "[6] OK  cert.pem va key.pem la mot cap" -ForegroundColor Green } else { Write-Host "[6] FAIL cert.pem va key.pem KHONG khop" -ForegroundColor Red }
+
+
+https://api.volvogenaihubqa.volvogroup.net/
