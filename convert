@@ -1,29 +1,32 @@
 https://api.volvogenaihubqa.volvogroup.net/
 
-$api = "https://api.volvogenaihubqa.volvogroup.net/"
-$p = [System.Net.WebRequest]::GetSystemWebProxy().GetProxy([Uri]$api)
+$ProgressPreference = 'SilentlyContinue'
+$api  = 'https://api.volvogenaihubqa.volvogroup.net/'
+$fqdn = 'api.volvogenaihubqa.volvogroup.net'
+$r = @()
 
-"=== 1. PROXY HE THONG TRA VE CHO API ==="
-if ($p.AbsoluteUri -eq ([Uri]$api).AbsoluteUri) {
-  "   DIRECT  (he thong noi: khong di qua proxy)"
+try {
+  $p = [System.Net.WebRequest]::GetSystemWebProxy().GetProxy([Uri]$api)
+  if ($p -and $p.AbsoluteUri -ne ([Uri]$api).AbsoluteUri) { $proxy = $p.AbsoluteUri }
+  else { $proxy = 'DIRECT' }
+} catch { $proxy = 'ERROR: ' + $_.Exception.Message }
+
+$r += "api var      = $api"
+$r += "1 SYSPROXY   = $proxy"
+
+$s = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+$r += "2 ProxyEnable= " + $s.ProxyEnable
+$r += "2 ProxyServer= " + $s.ProxyServer
+$r += "2 AutoConfig = " + $s.AutoConfigURL
+$r += "3 WinHTTP    = " + (((netsh winhttp show proxy) -join ' ') -replace '\s+',' ').Trim()
+
+$t = Test-NetConnection $fqdn -Port 443 -WarningAction SilentlyContinue
+$r += "4 TCP443     = " + $t.TcpTestSucceeded + "  ip=" + $t.RemoteAddress
+
+if ($proxy -ne 'DIRECT' -and $proxy -notlike 'ERROR*') {
+  $r += "5 VIAPROXY   = HTTP " + (curl.exe -sS -o NUL -w '%{http_code}' --max-time 25 -x $proxy $api 2>&1)
 } else {
-  "   PROXY   " + $p.AbsoluteUri
+  $r += "5 VIAPROXY   = (skip, khong co proxy)"
 }
 
-"`n=== 2. CAU HINH TRONG REGISTRY ==="
-Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' |
-  Select-Object ProxyEnable, ProxyServer, AutoConfigURL | Format-List
-
-"=== 3. WINHTTP ==="
-netsh winhttp show proxy
-
-"`n=== 4. THU KET NOI TRUC TIEP (khong proxy) ==="
-$t = Test-NetConnection api.volvogenaihubqa.volvogroup.net -Port 443 -WarningAction SilentlyContinue
-"   TcpTestSucceeded = " + $t.TcpTestSucceeded
-
-"`n=== 5. THU KET NOI QUA PROXY ==="
-if ($p.AbsoluteUri -ne ([Uri]$api).AbsoluteUri) {
-  curl.exe -sS -o NUL -w '   qua proxy -> HTTP %{http_code}\n' --max-time 25 -x $p.AbsoluteUri $api
-} else {
-  "   (bo qua - he thong khong khai bao proxy nao)"
-}
+"";"=============== KET QUA ==============="; $r; "======================================="
