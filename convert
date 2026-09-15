@@ -1,43 +1,29 @@
-$ssl = "C:\Program Files\OpenSSL-Win64\bin\openssl.exe"
-$src = "D:\Certificate\2026"
-$out = "D:\cert_260914"
-New-Item -ItemType Directory -Force $out | Out-Null
-$cer  = Join-Path $src "vcexrportal.cha.volvo.net.cer"
-$ca   = Join-Path $src "ca.pem"
-$leaf = Join-Path $out "leaf.pem"
-$cert = Join-Path $out "cert.pem"
-$key  = Join-Path $out "key.pem"
-& $ssl x509 -in $cer -inform DER -out $leaf 2>$null
-if (-not (Test-Path $leaf)) { & $ssl x509 -in $cer -inform PEM -out $leaf 2>$null }
-if (Test-Path $leaf) { Write-Host "[1] OK  doc duoc certificate" -ForegroundColor Green } else { Write-Host "[1] FAIL khong doc duoc $cer" -ForegroundColor Red }
-$want = (& $ssl x509 -in $leaf -noout -pubkey) -join "`n"
-$match = $null
-foreach ($k in (Get-ChildItem $src -File)) { $got = (& $ssl pkey -in $k.FullName -pubout 2>$null) -join "`n"; if ($got -and $got -eq $want) { $match = $k.FullName; break } }
-if ($match) { Write-Host "[2] OK  khoa dung: $match" -ForegroundColor Green } else { Write-Host "[2] FAIL khong co khoa nao khop certificate" -ForegroundColor Red }
-& $ssl pkcs8 -topk8 -nocrypt -in $match -out $key
-Get-Content $leaf, $ca | Set-Content $cert -Encoding ascii
-Write-Host "[3] chain:"; & $ssl verify -CAfile $ca $leaf
-Write-Host "[4] noi dung certificate:"; & $ssl x509 -in $cert -noout -subject -dates -ext subjectAltName
-Write-Host ("[5] so certificate trong cert.pem: " + (Select-String -Path $cert -Pattern 'BEGIN CERTIFICATE' -AllMatches).Count)
-$a = (& $ssl x509 -in $cert -noout -pubkey) -join "`n"; $b = (& $ssl pkey -in $key -pubout) -join "`n"
-if ($a -eq $b) { Write-Host "[6] OK  cert.pem va key.pem la mot cap" -ForegroundColor Green } else { Write-Host "[6] FAIL cert.pem va key.pem KHONG khop" -ForegroundColor Red }
-
-
 https://api.volvogenaihubqa.volvogroup.net/
 
+$api = "https://api.volvogenaihubqa.volvogroup.net/"
+$p = [System.Net.WebRequest]::GetSystemWebProxy().GetProxy([Uri]$api)
 
-py --version
-py -m pip install fastapi uvicorn python-dotenv jinja2 python-multipart requests
+"=== 1. PROXY HE THONG TRA VE CHO API ==="
+if ($p.AbsoluteUri -eq ([Uri]$api).AbsoluteUri) {
+  "   DIRECT  (he thong noi: khong di qua proxy)"
+} else {
+  "   PROXY   " + $p.AbsoluteUri
+}
 
-cd D:\Volvo\260909_Volvo\C2I\gpt
-py -m uvicorn app:app --reload
+"`n=== 2. CAU HINH TRONG REGISTRY ==="
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' |
+  Select-Object ProxyEnable, ProxyServer, AutoConfigURL | Format-List
 
-
-Write-Host "=== [1] Cau hinh proxy cua may ==="
+"=== 3. WINHTTP ==="
 netsh winhttp show proxy
-Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Select-Object ProxyEnable,ProxyServer,AutoConfigURL
-Write-Host "=== [2] TCP truc tiep tu PowerShell ==="
-Test-NetConnection api.volvogenaihubqa.volvogroup.net -Port 443 | Select-Object ComputerName,RemoteAddress,TcpTestSucceeded
-Write-Host "=== [3] TCP truc tiep tu chinh Node ==="
-node -e "require('net').connect({host:'api.volvogenaihubqa.volvogroup.net',port:443},()=>{console.log('  Node TCP: OK');process.exit(0)}).on('error',e=>{console.log('  Node TCP: FAIL '+e.code);process.exit(1)}).setTimeout(10000,function(){console.log('  Node TCP: TIMEOUT');process.exit(1)})"
 
+"`n=== 4. THU KET NOI TRUC TIEP (khong proxy) ==="
+$t = Test-NetConnection api.volvogenaihubqa.volvogroup.net -Port 443 -WarningAction SilentlyContinue
+"   TcpTestSucceeded = " + $t.TcpTestSucceeded
+
+"`n=== 5. THU KET NOI QUA PROXY ==="
+if ($p.AbsoluteUri -ne ([Uri]$api).AbsoluteUri) {
+  curl.exe -sS -o NUL -w '   qua proxy -> HTTP %{http_code}\n' --max-time 25 -x $p.AbsoluteUri $api
+} else {
+  "   (bo qua - he thong khong khai bao proxy nao)"
+}
